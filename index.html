@@ -25,42 +25,17 @@
 
   <script>
     // ======= 0G Network Add/Switch =======
-    const chainIdHex = "0x13c";
-    document.getElementById("add0gBtn").onclick = async () => {
-      if (window.ethereum) {
-        try {
-          await window.ethereum.request({
-            method: "wallet_switchEthereumChain",
-            params: [{ chainId: chainIdHex }]
-          });
-        } catch (switchError) {
-          if (switchError.code === 4902) {
-            try {
-              await window.ethereum.request({
-                method: "wallet_addEthereumChain",
-                params: [{
-                  chainId: chainIdHex,
-                  chainName: "ZeroGravity Testnet",
-                  nativeCurrency: { name: "0G", symbol: "0G", decimals: 18 },
-                  rpcUrls: ["https://chainscan-galileo.0g.ai/rpc"],
-                  blockExplorerUrls: ["https://chainscan-galileo.0g.ai/"]
-                }]
-              });
-              await window.ethereum.request({
-                method: "wallet_switchEthereumChain",
-                params: [{ chainId: chainIdHex }]
-              });
-            } catch (addError) {
-              alert("Failed to add/switch 0G network: " + addError.message);
-            }
-          } else {
-            alert("Failed to switch network: " + switchError.message);
-          }
-        }
-      } else {
-        alert("MetaMask not found!");
-      }
-    };
+    async function connectWallet() {
+    if (!window.ethereum) return alert("Please install MetaMask or OKX Wallet");
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+
+    await provider.send("wallet_addEthereumChain", [{
+      chainId: '0x40d9',
+      chainName: '0G-Galileo-Testnet',
+      rpcUrls: ['https://evmrpc-testnet.0g.ai'],
+      nativeCurrency: { name: 'OG Token', symbol: 'OG', decimals: 18 },
+      blockExplorerUrls: ['https://chainscan-galileo.0g.ai/']
+    }]);
     // ======= END 0G NETWORK =======
 
     // ======= ARRAY airdropData dari file lo, GAK USAH DIGANTI! =======
