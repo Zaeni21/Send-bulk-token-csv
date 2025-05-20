@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Airdrop JWR by CSV</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center justify-center">
+  <div class="max-w-xl w-full bg-white rounded-xl shadow p-6 my-6">
+    <h1 class="text-2xl font-bold mb-4 text-center">Airdrop JWR by CSV</h1>
+    <input type="file" id="csvFile" accept=".csv" class="mb-3"/>
+    <div id="previewTable" class="overflow-x-auto mb-3"></div>
+    <button id="connectBtn" class="bg-blue-600 text-white px-4 py-2 rounded mb-2 w-full">Connect Wallet</button>
+    <button id="airdropBtn" class="bg-green-600 text-white px-4 py-2 rounded w-full" disabled>Send All</button>
+    <div id="status" class="mt-4 text-xs"></div>
+  </div>
+  <script>
+    // ERC20 JWR
+    const jwrAddress = "0x4e54b5aeb805d826a6c1ad8abc9cbf05e49457c3";
+    const jwrAbi = [
+      "function transfer(address to, uint256 amount) public returns (bool)",
+      "function decimals() public view returns (uint8)"
+    ];
+
+    let airdropData = [];
+    let decimals = 18;
+    let provider, signer, jwr;
+
+    document.getElementById("csvFile").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          airdropData = results.data.filter(row =>
+            row.holder_address && row.amount && !isNaN(Number(row.amount))
+          );
+          showPreview();
+        }
+      });
+    });
+
+    function showPreview() {
+      if (!airdropData.length) {
+        document.getElementById("previewTable").innerHTML = "";
+        document.getElementById("airdropBtn").disabled = true;
+        return;
+      }
+      let html = "<table class='min-w-full text-xs text-left'><thead><tr><th>Address</th><th>Amount</th><th>Status</th></tr></thead><tbody>";
+      for (const row of airdropData.slice(0, 15)) {
+        html += `<tr><td>${row.holder_address}</td><td>${row.amount}</td><td id="status-${row.holder_address}"></td></tr>`;
+      }
+      if (airdropData.length > 15) html += `<tr><td colspan=3 class='italic text-center'>...+${airdropData.length - 15} more</td></tr>`;
+      html += "</tbody></table>";
+      document.getElementById("previewTable").innerHTML = html;
+      document.getElementById("airdropBtn").disabled = false;
+    }
+
+    document.getElementById("connectBtn").onclick = async () => {
+      if (!window.ethereum) return alert("Install MetaMask/OKX!");
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      jwr = new ethers.Contract(jwrAddress, jwrAbi, signer);
+      decimals = await jwr.decimals();
+      document.getElementById("connectBtn").innerText = "Wallet Connected";
+      document.getElementById("connectBtn").disabled = true;
+    };
+
+    document.getElementById("airdropBtn").onclick = async () => {
+      if (!jwr || !signer) return alert("Connect wallet dulu bro!");
+      document.getElementById("airdropBtn").disabled = true;
+      let statusBox = document.getElementById("status");
+      statusBox.innerHTML = "Sending tokens...<br>";
+      for (let i = 0; i < airdropData.length; i++) {
+        const addr = airdropData[i].holder_address.trim();
+        const amount = ethers.utils.parseUnits(airdropData[i].amount.toString(), decimals);
+        try {
+          let tx = await jwr.transfer(addr, amount);
+          document.getElementById("status-"+addr).innerText = "Pending...";
+          await tx.wait();
+          document.getElementById("status-"+addr).innerText = "✅ Success";
+        } catch (e) {
+          document.getElementById("status-"+addr).innerText = "❌ Fail";
+          statusBox.innerHTML += `<span class='text-red-500'>Error sending to ${addr}: ${e.message}</span><br>`;
+        }
+      }
+      statusBox.innerHTML += "<b>DONE</b>";
+    };
+  </script>
+</body>
+</html>
