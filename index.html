@@ -137,18 +137,16 @@
   }
 
   // Kirim semua sekali jalan
-  try {
-    const addresses = airdropData.map(d => d.holder_address);
-    const amounts = airdropData.map(d => ethers.utils.parseUnits(d.amount, 18));
-    statusBox.innerText += "Mengirim semua batch...\n";
-    const tx = await distributorContract.batchTransfer(addresses, amounts);
-    statusBox.innerText += `Tx: ${tx.hash}\nMenunggu confirm...\n`;
-    await tx.wait();
-    statusBox.innerText += "Airdrop selesai!\n";
-  } catch (e) {
-    statusBox.innerText += "Gagal kirim: " + e.message;
-  }
-};
+  const batchSize = 50;
+for (let i = 0; i < airdropData.length; i += batchSize) {
+  const batch = airdropData.slice(i, i + batchSize);
+  const addresses = batch.map(d => d.holder_address);
+  const amounts = batch.map(d => ethers.utils.parseUnits(d.amount, 18));
+  const tx = await distributorContract.batchTransfer(addresses, amounts);
+  await tx.wait();
+}
+  } statusBox.innerText += "Airdrop selesai!";
+    };
     
   </script>
 </body>
