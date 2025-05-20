@@ -112,37 +112,68 @@
     }
 
     airdropBtn.onclick = async () => {
-      if (!distributorContract) return alert("Connect wallet dulu bro!");
-      if (airdropData.length === 0) return alert("airdropData kosong!");
+  if (!signer || !distributorContract) {
+    return alert("Connect wallet dulu bro!");
+  }
 
-      statusBox.innerText = "Airdrop started...\n";
+  if (airdropData.length === 0) {
+    return alert("airdropData kosong!");
+  }
+
+  const jwrAddress = "0x4e54b5aeb805d826a6c1ad8abc9cbf05e49457c3";
+  const spender = "0x69D9324C4977cbA0b618D10907c8557a4491e96F";
+  const jwrAbi = [
+    "function approve(address spender, uint256 amount) external returns (bool)"
+  ];
+  const token = new ethers.Contract(jwrAddress, jwrAbi, signer);
+
+  // Total amount dari airdropData
+  const totalAmount = airdropData.reduce(
+    (sum, d) => sum.add(ethers.utils.parseUnits(d.amount, 18)),
+    ethers.BigNumber.from(0)
+  );
+
+  try {
+    statusBox.innerText = "Approving token...\n";
+    const approveTx = await token.approve(spender, totalAmount);
+    await approveTx.wait();
+    statusBox.innerText += "Approve confirmed!\n";
+  } catch (e) {
+    return statusBox.innerText = "Approve failed: " + e.message;
+  }
+
+  // Lanjut airdrop
+  statusBox.innerText += "Airdrop started...\n";
+  const decimals = 18;
+  const batchSize = 50;
+
+  for (let i = 0; i < airdropData.length; i += batchSize) {
+    const batch = airdropData.slice(i, i + batchSize);
+    const addresses = batch.map(d => d.holder_address);
+    const amounts = batch.map(d => ethers.utils.parseUnits(d.amount, decimals));
+
+    try {
+      const tx = await distributorContract.batchTransfer(addresses, amounts);
+      statusBox.innerText += `Batch sent! (tx: ${tx.hash})\n`;
+      await tx.wait();
+      batch.forEach(({holder_address, amount}) => {
+        document.getElementById("airdropRows").innerHTML += `<tr><td>${holder_address}</td><td>${amount}</td><td class="text-green-600">Sent</td></tr>`;
+      });
+    } catch (e) {
+      statusBox.innerText += `Batch failed: ${e.message}\n`;
+      batch.forEach(({holder_address, amount}) => {
+        document.getElementById("airdropRows").innerHTML += `<tr><td>${holder_address}</td><td>${amount}</td><td class="text-red-600">Failed</td></tr>`;
+      });
+      break;
+    }
+    await delay(2000);
+  }
+
+  statusBox.innerText = "Airdrop started...\n";
       const decimals = 18;
       const batchSize = 50;
-
-      for (let i = 0; i < airdropData.length; i += batchSize) {
-        const batch = airdropData.slice(i, i + batchSize);
-        const addresses = batch.map(d => d.holder_address);
-        const amounts = batch.map(d => ethers.utils.parseUnits(d.amount, decimals));
-
-        try {
-          const tx = await distributorContract.batchTransfer(addresses, amounts);
-          statusBox.innerText += `Batch sent! (tx: ${tx.hash})\n`;
-          await tx.wait();
-          batch.forEach(({holder_address, amount}) => {
-            document.getElementById("airdropRows").innerHTML += `<tr><td>${holder_address}</td><td>${amount}</td><td class="text-green-600">Sent</td></tr>`;
-          });
-        } catch (e) {
-          statusBox.innerText += `Batch failed: ${e.message}\n`;
-          batch.forEach(({holder_address, amount}) => {
-            document.getElementById("airdropRows").innerHTML += `<tr><td>${holder_address}</td><td>${amount}</td><td class="text-red-600">Failed</td></tr>`;
-          });
-          break;
-        }
-        await delay(2000);
-      }
-
-      statusBox.innerText += "Airdrop finished!";
-    };
+};
+  
   </script>
 </body>
 </html>
